@@ -1,0 +1,8 @@
+name: Local Support API
+values:
+  - key: base_url
+    value: ''
+    enabled: true
+  - key: Token
+    value: ''
+    enabled: true

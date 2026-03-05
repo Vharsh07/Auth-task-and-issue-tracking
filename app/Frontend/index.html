@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Task & Issue Manager</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+body { font-family:'Helvetica',sans-serif; }
+input:focus { outline:none;border-color:#6366F1; }
+button:focus { outline:none; }
+</style>
+</head>
+<body class="bg-gray-100 min-h-screen flex flex-col items-center p-6">
+
+<h1 class="text-4xl font-bold mb-6">Task & Issue Manager</h1>
+
+<!-- REGISTER -->
+<div class="bg-white shadow rounded p-6 w-full max-w-md mb-6">
+<h2 class="text-2xl font-semibold mb-4">Register</h2>
+<input id="reg_email" placeholder="Email" class="border p-2 w-full mb-2">
+<input id="reg_password" type="password" placeholder="Password" class="border p-2 w-full mb-2">
+<button onclick="register()" class="bg-blue-500 text-white px-4 py-2 rounded w-full">Register</button>
+</div>
+
+<!-- LOGIN -->
+<div class="bg-white shadow rounded p-6 w-full max-w-md mb-6">
+<h2 class="text-2xl font-semibold mb-4">Login</h2>
+<input id="login_email" placeholder="Email" class="border p-2 w-full mb-2">
+<input id="login_password" type="password" placeholder="Password" class="border p-2 w-full mb-2">
+<button onclick="login()" class="bg-green-500 text-white px-4 py-2 rounded w-full">Login</button>
+</div>
+
+<!-- TASKS + ISSUES -->
+<div class="bg-white shadow rounded p-6 w-full max-w-md mb-6" id="task-section" style="display:none;">
+<h2 class="text-2xl font-semibold mb-4">Tasks</h2>
+<input id="task_title" placeholder="Title" class="border p-2 w-full mb-2">
+<input id="task_desc" placeholder="Description" class="border p-2 w-full mb-2">
+<button onclick="createTask()" class="bg-purple-500 text-white px-4 py-2 rounded w-full">Add Task</button>
+<h3 class="text-xl font-semibold mt-4 mb-2">My Tasks</h3>
+<ul id="task_list" class="list-disc pl-5 mb-4"></ul>
+
+<h2 class="text-2xl font-semibold mb-2">Issues</h2>
+<input id="issue_title" placeholder="Issue Title" class="border p-2 w-full mb-2">
+<input id="issue_desc" placeholder="Description" class="border p-2 w-full mb-2">
+<button onclick="createIssue()" class="bg-yellow-500 text-white px-4 py-2 rounded w-full">Add Issue</button>
+<h3 class="text-xl font-semibold mt-4 mb-2">Issues</h3>
+<ul id="issue_list" class="list-disc pl-5 mb-4"></ul>
+
+<button onclick="logout()" class="bg-red-500 text-white px-4 py-2 rounded w-full mt-4">Logout</button>
+</div>
+
+<script>
+const API="http://127.0.0.1:8000"; // Change if deployed
+// const API="https://auth-task-and-issue.onrender.com";
+let userRole="user";
+
+// REGISTER
+async function register(){
+  const res=await fetch(API+"/register",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:document.getElementById("reg_email").value,password:document.getElementById("reg_password").value})});
+  alert(res.status===201?"Registered successfully!":"Error: "+(await res.json()).detail);
+}
+
+// LOGIN
+async function login(){
+  const res=await fetch(API+"/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:document.getElementById("login_email").value,password:document.getElementById("login_password").value})});
+  if(res.status===200){
+    const data=await res.json();
+    localStorage.setItem("token",data.access_token);
+    const payload=JSON.parse(atob(data.access_token.split('.')[1]));
+    userRole=payload.role;
+    alert("Login successful! Role: "+userRole);
+    document.getElementById("task-section").style.display="block";
+    getTasks();getIssues();
+  } else {alert("Error: "+(await res.json()).detail);}
+}
+
+// LOGOUT
+function logout(){localStorage.removeItem("token");document.getElementById("task-section").style.display="none";alert("Logged out!");}
+
+// TASKS
+async function createTask(){const token=localStorage.getItem("token");await fetch(API+"/tasks",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+token},body:JSON.stringify({title:document.getElementById("task_title").value,description:document.getElementById("task_desc").value})});getTasks();}
+async function getTasks(){const token=localStorage.getItem("token");const res=await fetch(API+"/tasks",{headers:{"Authorization":"Bearer "+token}});if(res.status===200){const tasks=await res.json();const list=document.getElementById("task_list");list.innerHTML="";tasks.forEach(t=>{const li=document.createElement("li");li.textContent=t.title+" - "+(t.description||"");list.appendChild(li);});}}
+
+// ISSUES
+async function createIssue(){const token=localStorage.getItem("token");await fetch(API+"/issues",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+token},body:JSON.stringify({title:document.getElementById("issue_title").value,description:document.getElementById("issue_desc").value})});getIssues();}
+async function getIssues(){const token=localStorage.getItem("token");const res=await fetch(API+"/issues",{headers:{"Authorization":"Bearer "+token}});if(res.status===200){const issues=await res.json();const list=document.getElementById("issue_list");list.innerHTML="";issues.forEach(i=>{const li=document.createElement("li");li.textContent=i.title+" - "+i.description+" ["+i.status+"]";
+  if(userRole==="admin" && i.status==="pending"){const btn=document.createElement("button");btn.textContent="Resolve";btn.className="ml-2 bg-green-500 text-white px-2 py-1 rounded";btn.onclick=()=>updateIssueStatus(i.id,"resolved");li.appendChild(btn);}
+  list.appendChild(li);});}}
+
+// UPDATE ISSUE STATUS (ADMIN ONLY)
+async function updateIssueStatus(issueId,status){
+  const token=localStorage.getItem("token");
+  await fetch(API+"/issues/"+issueId,{method:"PUT",headers:{"Content-Type":"application/json","Authorization":"Bearer "+token},body:JSON.stringify({status})});
+  getIssues();
+}
+</script>
+</body>
+</html>
